@@ -29,6 +29,7 @@ import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -42,6 +43,7 @@ import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.GetBucketAclResponse;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.Grant;
 import software.amazon.awssdk.services.s3.model.ListBucketsRequest;
 import software.amazon.awssdk.services.s3.model.Permission;
@@ -165,6 +167,13 @@ public class S3ServiceClient {
             }
         }
         client.putObject(builder.build(), requestBody);
+    }
+
+    public void downloadObject(String bucketName, String key, Path path) {
+        client.getObject(GetObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .build(), ResponseTransformer.toFile(path));
     }
 
     public void copyObject(String srcBucketName, String srcKey, String destBucketName, String destKey,

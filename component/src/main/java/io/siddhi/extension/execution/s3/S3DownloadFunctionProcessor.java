@@ -1,21 +1,3 @@
-/*
- *  Copyright (c) 2020, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
- *
- *  WSO2 Inc. licenses this file to you under the Apache License,
- *  Version 2.0 (the "License"); you may not use this file except
- *  in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing,
- *  software distributed under the License is distributed on an
- *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- *  KIND, either express or implied. See the License for the
- *  specific language governing permissions and limitations
- *  under the License.
- */
-
 package io.siddhi.extension.execution.s3;
 
 import io.siddhi.annotation.Example;
@@ -31,14 +13,12 @@ import io.siddhi.core.query.processor.stream.function.StreamFunctionProcessor;
 import io.siddhi.core.util.config.ConfigReader;
 import io.siddhi.core.util.snapshot.state.StateFactory;
 import io.siddhi.extension.common.S3ServiceClient;
-import io.siddhi.extension.common.beans.BucketConfig;
 import io.siddhi.extension.common.beans.ClientConfig;
 import io.siddhi.extension.common.utils.S3Constants;
 import io.siddhi.extension.io.s3.sink.internal.publisher.EventPublisherThreadPoolExecutor;
 import io.siddhi.query.api.definition.AbstractDefinition;
 import io.siddhi.query.api.definition.Attribute;
 import org.apache.log4j.Logger;
-import software.amazon.awssdk.services.s3.model.StorageClass;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -51,19 +31,13 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
- * {@code S3UploadFunctionProcessor} handles uploading files to S3 buckets.
+ * {@code S3DownloadFunctionProcessor} handles downloading S3 objects as files.
  */
 @Extension(
-        name = "uploadFile",
+        name = "downloadFile",
         namespace = "s3",
-        description = "Uploads a file to an Amazon AWS S3 bucket",
+        description = "Download an S3 object and save it as a file",
         parameters = {
-                @Parameter(
-                        name = "file.path",
-                        description = "Path of the file to be uploaded",
-                        type = DataType.STRING,
-                        dynamic = true
-                ),
                 @Parameter(
                         name = "bucket.name",
                         description = "Name of the S3 bucket",
@@ -73,6 +47,12 @@ import java.util.concurrent.TimeUnit;
                 @Parameter(
                         name = "key",
                         description = "Key of the object",
+                        type = DataType.STRING,
+                        dynamic = true
+                ),
+                @Parameter(
+                        name = "file.path",
+                        description = "Path of the file to be uploaded",
                         type = DataType.STRING,
                         dynamic = true
                 ),
@@ -119,86 +99,57 @@ import java.util.concurrent.TimeUnit;
                         type = DataType.STRING,
                         optional = true,
                         defaultValue = "EMPTY_STRING"
-                ),
-                @Parameter(
-                        name = "versioning.enabled",
-                        description = "Flag to enable versioning support in the bucket",
-                        type = DataType.STRING,
-                        optional = true,
-                        defaultValue = "false"
-                ),
-                @Parameter(
-                        name = "bucket.acl",
-                        description = "Access control list for the bucket",
-                        type = DataType.STRING,
-                        optional = true,
-                        defaultValue = "EMPTY_STRING"
                 )
         },
         parameterOverloads = {
                 @ParameterOverload(
-                        parameterNames = {"file.path", "bucket.name", "key"}
+                        parameterNames = {"bucket.name", "key", "file.path"}
                 ),
                 @ParameterOverload(
-                        parameterNames = {"file.path", "bucket.name", "key", "async"}
+                        parameterNames = {"bucket.name", "key", "file.path", "async"}
                 ),
                 @ParameterOverload(
-                        parameterNames = {"file.path", "bucket.name", "key", "async", "credential.provider.class"}
+                        parameterNames = {"bucket.name", "key", "file.path", "async", "credential.provider.class"}
                 ),
                 @ParameterOverload(
-                        parameterNames = {"file.path", "bucket.name", "key", "async", "credential.provider.class",
+                        parameterNames = {"bucket.name", "key", "file.path", "async", "credential.provider.class",
                                 "aws.region"}
                 ),
                 @ParameterOverload(
-                        parameterNames = {"file.path", "bucket.name", "key", "async", "credential.provider.class",
-                                "aws.region", "storage.class"}
-                ),
-                @ParameterOverload(
-                        parameterNames = {"file.path", "bucket.name", "key", "async", "credential.provider.class",
-                                "aws.region", "storage.class", "aws.access.key", "aws.secret.key"}
-                ),
-                @ParameterOverload(
-                        parameterNames = {"file.path", "bucket.name", "key", "async", "credential.provider.class",
-                                "aws.region", "storage.class", "aws.access.key", "aws.secret.key", "versioning.enabled"}
-                ),
-                @ParameterOverload(
-                        parameterNames = {"file.path", "bucket.name", "key", "async", "credential.provider.class",
-                                "aws.region", "storage.class", "aws.access.key", "aws.secret.key", "versioning.enabled",
-                                "bucket.acl"}
+                        parameterNames = {"bucket.name", "key", "file.path", "async", "credential.provider.class",
+                                "aws.region", "aws.access.key", "aws.secret.key"}
                 )
         },
         examples = {
                 @Example(
-                        syntax = "from FooStream#s3:uploadFile('/Users/wso2/files/stocks.txt', 's3-file-bucket', " +
-                                "'/uploads/stocks.txt')",
-                        description = "Creates an object with the file content at '/uploads/stocks.txt' in the bucket."
+                        syntax = "from FooStream#s3:downloadFile('s3-file-bucket', '/uploads/stocks.txt', " +
+                                "'/Users/wso2/files/stocks.txt')",
+                        description = "Download the object '/uploads/stocks.txt' in the bucket and save it as a file."
                 )
         }
 )
-public class S3UploadFunctionProcessor extends StreamFunctionProcessor {
-    private static final Logger logger = Logger.getLogger(S3UploadFunctionProcessor.class);
+public class S3DownloadFunctionProcessor extends StreamFunctionProcessor {
+    private static final Logger logger = Logger.getLogger(S3DownloadFunctionProcessor.class);
 
     private BlockingQueue<Runnable> taskQueue;
     private EventPublisherThreadPoolExecutor executor;
 
     @Override
     protected Object[] process(Object[] data) {
-        if (data.length < 3 || data.length == 8 || data.length > 11) {
+
+        if (data.length < 3 || data.length == 7 || data.length > 8) {
             throw new SiddhiAppCreationException("Invalid number of parameters.");
         }
-
-        String[] parameterList = new String[]{
-                S3Constants.FILE_PATH,
+        // region ???
+        String[] parameterList = new String[] {
                 S3Constants.BUCKET_NAME,
                 S3Constants.KEY,
+                S3Constants.FILE_PATH,
                 S3Constants.ASYNC,
                 S3Constants.CREDENTIAL_PROVIDER_CLASS,
                 S3Constants.AWS_REGION,
-                S3Constants.STORAGE_CLASS,
                 S3Constants.AWS_ACCESS_KEY,
-                S3Constants.AWS_SECRET_KEY,
-                S3Constants.VERSIONING_ENABLED,
-                S3Constants.BUCKET_ACL
+                S3Constants.AWS_SECRET_KEY
         };
 
         Map<String, Object> parameterMap = new HashMap<>();
@@ -207,28 +158,29 @@ public class S3UploadFunctionProcessor extends StreamFunctionProcessor {
         }
 
         ClientConfig clientConfig = ClientConfig.fromMap(parameterMap);
-        BucketConfig bucketConfig = BucketConfig.fromMap(parameterMap);
 
-        String filePath = (String) parameterMap.get(S3Constants.FILE_PATH);
+        String bucketName = (String) parameterMap.get(S3Constants.BUCKET_NAME);
         String key = (String) parameterMap.get(S3Constants.KEY);
-        StorageClass storageClass = parameterMap.containsKey(S3Constants.STORAGE_CLASS) ?
-                StorageClass.fromValue((String) parameterMap.get(S3Constants.STORAGE_CLASS)) : StorageClass.STANDARD;
+        String filePath = (String) parameterMap.get(S3Constants.FILE_PATH);
         boolean async = (boolean) parameterMap.getOrDefault(S3Constants.ASYNC, false);
 
         // Validate parameters
-        if (filePath == null || filePath.isEmpty()) {
-            throw new SiddhiAppCreationException("Parameter '" + S3Constants.FILE_PATH + "' is required.");
+        if (bucketName == null || bucketName.isEmpty()) {
+            throw new SiddhiAppCreationException("Parameter '" + S3Constants.BUCKET_NAME + "' is required.");
         }
 
         if (key == null || key.isEmpty()) {
             throw new SiddhiAppCreationException("Parameter '" + S3Constants.KEY + "' is required.");
         }
 
-        clientConfig.validate();
-        bucketConfig.validate();
+        if (filePath == null || filePath.isEmpty()) {
+            throw new SiddhiAppCreationException("Parameter '" + S3Constants.FILE_PATH + "' is required.");
+        }
 
-        // Upload the object
-        UploadTask task = new UploadTask(clientConfig, bucketConfig, key, Paths.get(filePath), storageClass);
+        clientConfig.validate();
+
+        // Download the object
+        DownloadTask task = new DownloadTask(clientConfig, bucketName, key, Paths.get(filePath));
         if (async) {
             taskQueue.add(task);
         } else {
@@ -276,30 +228,25 @@ public class S3UploadFunctionProcessor extends StreamFunctionProcessor {
         return ProcessingMode.BATCH;
     }
 
-    class UploadTask implements Runnable {
+    class DownloadTask implements Runnable {
         private final ClientConfig clientConfig;
-        private final BucketConfig bucketConfig;
+        private final String bucketName;
         private final String key;
         private final Path path;
-        private final StorageClass storageClass;
 
-        UploadTask(ClientConfig clientConfig, BucketConfig bucketConfig, String key, Path path,
-                   StorageClass storageClass) {
+        DownloadTask(ClientConfig clientConfig, String bucketName, String key, Path path) {
             this.clientConfig = clientConfig;
-            this.bucketConfig = bucketConfig;
+            this.bucketName = bucketName;
             this.key = key;
             this.path = path;
-            this.storageClass = storageClass;
         }
 
         @Override
         public void run() {
             S3ServiceClient client = new S3ServiceClient(clientConfig);
-            client.ensureBucketAvailability(bucketConfig);
-            client.uploadObject(bucketConfig.getBucketName(), key, path, storageClass);
+            client.downloadObject(bucketName, key, path);
 
-            logger.debug("Object '" + key + "' uploaded to S3 bucket '" + bucketConfig.getBucketName() +
-                    "' successfully.");
+            logger.debug("Object '" + key + "' saved at " + path.toString());
         }
     }
 }
